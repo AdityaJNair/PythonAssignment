@@ -2,9 +2,19 @@ import os
 import sys
 import pickle
 import time
+import threading
+import atexit
+import re
+from queue import Queue
 
+
+#GLOBAL ANY VAR
+ANY = 'any'
 class MessageProc:
-    ANY = True
+
+    communication_queue = Queue()
+    arrived_condition = threading.Condition()
+
 
     '''
         Sending a message
@@ -15,11 +25,15 @@ class MessageProc:
         to the other processor through a pipe
     '''
     def give(self, pid, label, *values):
-        pipe_name = '/tmp/%d.fifo' %(os.getpid())
-        fifo = open(pipe_name, 'wb')
-        pickle.dump((pid, label, *values ), pipe_name )
-        fifo.close()
-
+        pipe_name = '/tmp/%d.fifo' %(pid)
+        if(os.path.exists(pipe_name)):
+            with open(pipe_name, 'wb') as fifo:
+                tmp_list = []
+                tmp_list.append(label)
+                tmp_list.append(list(values))
+                pickle.dump(tmp_list, fifo )
+                #print('this is in get tmp')
+                #print(tmp_list)
     '''
         In receive method we iterate through the *messages parameter
         and check the Message Objects made.
@@ -30,14 +44,18 @@ class MessageProc:
         Returns the lamda thing
     '''
     def receive(self, *messages):
-        pipe_name = '/tmp/%d.fifo' %(os.getpid())
-        fifo = open(pipe_name, 'rb')
-        for message in messages:
-            line = pickle.load(pipe_name)
-            if os.getpid() == line[0]:
-                if message.get_data_message == line[1] or message.get_data_message == ANY:
-                    return message.getAction()()
-        fifo.close()
+        while True:
+            if(self.communication_queue.qsize() != 0):
+                retreivedList = self.communication_queue.get()
+                print(retreivedList)
+                self.communication_queue.task_done()
+                for message in messages:
+                    if (message.data == retreivedList[0]) or (message.data == ANY):
+                        return message.action(*retreivedList[1])
+            else:
+                with self.arrived_condition:
+                    self.arrived_condition.wait()  # wait until new message
+
     '''
         Starts the new process and returns the identifier
     '''
@@ -46,8 +64,8 @@ class MessageProc:
         if(pid == 0):
             self.main()
         else:
-            return pid
-
+            time.sleep(0.1)
+        return pid
     '''
         Sets up the communication
         setup method
@@ -56,27 +74,43 @@ class MessageProc:
         #creates a pipe but if exists doesnt make another
         #for parent and child at same time
         #removes any previous pipes
-        print(os.getpid())
         pipe_name = '/tmp/%d.fifo' %(os.getpid())
-        if os.path.exists(pipe_name):
-            os.remove(pipe_name)
+        if not os.path.exists(pipe_name):
             os.mkfifo(pipe_name)
         #initialise any fields inside MessageProc
+        transfer_thread = threading.Thread(target=self.extract_from_pipe, daemon=True)
+        transfer_thread.start()
 
+
+
+    '''
+    from roberts lec
+    '''
+    def extract_from_pipe(self):
+        '''
+        Take all data in the pipe and transfer to the communications queue.
+        The reason for this being in a separate thread is so that the load does not
+        block the process and we can notify blocked receives.
+        '''
+        pipe_name = '/tmp/%d.fifo' %(os.getpid())
+        #print('{}  {} in extract'.format(os.getpid(), pipe_name))
+        if(os.path.exists(pipe_name)):
+            with open(pipe_name, 'rb') as pipe_rd:
+                while True:
+                    try:
+                        message = pickle.load(pipe_rd)
+                        with self.arrived_condition:
+                            self.communication_queue.put(message)
+                            self.arrived_condition.notify() #wake up anything waiting
+                    except EOFError: #no writer open yet
+                            time.sleep(0.01) # dont want to overload the cpu
 
 '''
     Message field class that stores the fields for the messages used in receive() and give()
 '''
 class Message:
-    data_message = ""
-    action = None
 
-    def __init__(self, data, action=None):
-        self.data_message = data
+    def __init__(self, data, action=lambda:None, guard=lambda:True):
+        self.data = data
         self.action = action
-
-    def get_data_message(self):
-        return self.data_message
-
-    def get_action(self):
-        return self.action
+        self.guard = guard
