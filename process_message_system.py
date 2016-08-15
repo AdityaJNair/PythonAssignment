@@ -2,9 +2,12 @@ import os
 import sys
 import pickle
 import time
+import re
 
 class MessageProc:
     ANY = True
+    pidParent = 0
+    pidChild = 0
 
     '''
         Sending a message
@@ -15,11 +18,11 @@ class MessageProc:
         to the other processor through a pipe
     '''
     def give(self, pid, label, *values):
-        pipe_name = '/tmp/%d.fifo' %(os.getpid())
-        fifo = open(pipe_name, 'wb')
-        pickle.dump((pid, label, *values ), pipe_name )
-        fifo.close()
-
+        pipe_out = '/tmp/%d.fifo' %(pid)
+        fifo_in = open(pipe_out, "w")
+        #fifo_in.write('\"%s\" \"%s\" \n' %(label, list(values)))
+        fifo_in.write('\'hello\' \'one\'\n')
+        fifo_in.close()
     '''
         In receive method we iterate through the *messages parameter
         and check the Message Objects made.
@@ -30,23 +33,27 @@ class MessageProc:
         Returns the lamda thing
     '''
     def receive(self, *messages):
-        pipe_name = '/tmp/%d.fifo' %(os.getpid())
-        fifo = open(pipe_name, 'rb')
-        for message in messages:
-            line = pickle.load(pipe_name)
-            if os.getpid() == line[0]:
-                if message.get_data_message == line[1] or message.get_data_message == ANY:
-                    return message.getAction()()
-        fifo.close()
+        pipe_in = '/tmp/%d.fifo' %(os.getpid())
+        fifo_out = open(pipe_in, 'r')
+        for line in fifo_out:
+            print(line)
+            line = re.findall('"([^"]*)"', line)
+            print(line)
+            for m in messages:
+                print('%s == %s' % (line[0], m.get_data_message()))
+                if m.get_data_message() == line[0]:
+                    return m.get_action()(line[1])
+        fifo_out.close()
+
     '''
         Starts the new process and returns the identifier
     '''
     def start(self, *args):
         pid = os.fork()
-        if(pid == 0):
-            self.main()
-        else:
+        if not (pid == 0):
             return pid
+        else:
+            self.main()
 
     '''
         Sets up the communication
@@ -56,11 +63,14 @@ class MessageProc:
         #creates a pipe but if exists doesnt make another
         #for parent and child at same time
         #removes any previous pipes
-        print(os.getpid())
         pipe_name = '/tmp/%d.fifo' %(os.getpid())
-        if os.path.exists(pipe_name):
+        if not os.path.exists(pipe_name):
+            os.mkfifo(pipe_name)
+        else:
             os.remove(pipe_name)
             os.mkfifo(pipe_name)
+        if self.pidParent == 0:
+            self.pidParent = os.getpid()
         #initialise any fields inside MessageProc
 
 
