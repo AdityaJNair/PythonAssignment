@@ -7,6 +7,8 @@ import atexit
 import re
 from queue import Queue
 
+#ANAI714
+#6393001
 
 #GLOBAL ANY VAR
 ANY = 'any'
@@ -135,8 +137,9 @@ class Message:
 
 class TimeOut:
 
-    def __init__(self, data, action=lambda:None):
-        print('test')
+    def __init__(self, timeout, action=lambda:None):
+        self.timeout = timeout
+        self.action = action
 
 @atexit.register
 def close():
