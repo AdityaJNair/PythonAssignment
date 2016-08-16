@@ -46,13 +46,17 @@ class MessageProc:
     '''
     def receive(self, *messages):
         while True:
-            '''
-            if(self.communication_queue.qsize() != 0):
-                retreivedList = self.communication_queue.get()
-                self.communication_queue.task_done()
-                for message in messages:
-                    if (message.data == retreivedList[0]) or (message.data == ANY):
-                        return message.action(*retreivedList[1])
+            if(self.communication_queue.qsize() != 0) or (len(self.communication_list) != 0):
+                if(self.communication_queue.qsize() != 0):
+                    item = self.communication_queue.get()
+                    self.communication_queue.task_done()
+                    self.communication_list.append(item)
+                for retreivedList in self.communication_list:
+                    for message in messages:
+                        if (message.guard()):
+                            if (message.data == retreivedList[0]) or (message.data == ANY):
+                                self.communication_list.remove(retreivedList)
+                                return message.action(*retreivedList[1])
             else:
                 with self.arrived_condition:
                     self.arrived_condition.wait()  # wait until new message
@@ -68,6 +72,7 @@ class MessageProc:
             else:
                 with self.arrived_condition:
                     self.arrived_condition.wait()
+            '''
     '''
         Starts the new process and returns the identifier
     '''
@@ -112,7 +117,7 @@ class MessageProc:
                     try:
                         message = pickle.load(pipe_rd)
                         with self.arrived_condition:
-                            self.communication_list.append(message)
+                            #self.communication_list.append(message)
                             self.communication_queue.put(message)
                             self.arrived_condition.notify() #wake up anything waiting
                     except EOFError: #no writer open yet
@@ -130,7 +135,7 @@ class Message:
 
 class TimeOut:
 
-    def __init__(self):
+    def __init__(self, data, action=lambda:None):
         print('test')
 
 @atexit.register
