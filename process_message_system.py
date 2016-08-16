@@ -14,6 +14,7 @@ class MessageProc:
 
     communication_queue = Queue()
     arrived_condition = threading.Condition()
+    communication_list = []
 
 
     '''
@@ -45,9 +46,9 @@ class MessageProc:
     '''
     def receive(self, *messages):
         while True:
+            '''
             if(self.communication_queue.qsize() != 0):
                 retreivedList = self.communication_queue.get()
-                print(retreivedList)
                 self.communication_queue.task_done()
                 for message in messages:
                     if (message.data == retreivedList[0]) or (message.data == ANY):
@@ -55,14 +56,25 @@ class MessageProc:
             else:
                 with self.arrived_condition:
                     self.arrived_condition.wait()  # wait until new message
-
+            '''
+            if(len(self.communication_list) != 0):
+                for l in self.communication_list:
+                    retreivedList = l
+                    for message in messages:
+                        if(message.guard()):
+                            if(message.data == retreivedList[0]) or (message.data == ANY):
+                                self.communication_list.remove(l)
+                                return message.action(*retreivedList[1])
+            else:
+                with self.arrived_condition:
+                    self.arrived_condition.wait()
     '''
         Starts the new process and returns the identifier
     '''
     def start(self, *args):
         pid = os.fork()
         if(pid == 0):
-            self.main()
+            self.main(*args)
         else:
             time.sleep(0.1)
         return pid
@@ -70,7 +82,7 @@ class MessageProc:
         Sets up the communication
         setup method
     '''
-    def main(self):
+    def main(self, *args):
         #creates a pipe but if exists doesnt make another
         #for parent and child at same time
         #removes any previous pipes
@@ -100,10 +112,11 @@ class MessageProc:
                     try:
                         message = pickle.load(pipe_rd)
                         with self.arrived_condition:
+                            self.communication_list.append(message)
                             self.communication_queue.put(message)
                             self.arrived_condition.notify() #wake up anything waiting
                     except EOFError: #no writer open yet
-                            time.sleep(0.01) # dont want to overload the cpu
+                            time.sleep(0.1) # dont want to overload the cpu
 
 '''
     Message field class that stores the fields for the messages used in receive() and give()
@@ -114,3 +127,14 @@ class Message:
         self.data = data
         self.action = action
         self.guard = guard
+
+class TimeOut:
+
+    def __init__(self):
+        print('test')
+
+@atexit.register
+def close():
+    path = '/tmp/%d.fifo' %(os.getpid())
+    if (os.path.exists(path)):
+            os.remove(path)
