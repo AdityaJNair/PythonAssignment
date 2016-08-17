@@ -1,0 +1,40 @@
+start method
+	making a new process
+	call fork
+	child calls main
+main does
+	message passing thing
+	named pipes
+receive 
+	needs to look at the pipe and get data that way
+	something else running in the background checking on the pipe
+	pickle
+	want a second thread
+	
+	inside main
+self.arrived_condition = threading.Condition()
+
+transfer_thread = threading.Thread(target=self.extract_from_pipe, daemon=True)
+transfer_thread.start()
+What it is doing, starting up a thread. Automatically die when process fniishes.
+
+write in RB so pickle can be used
+
+def extract_from_pipe(self):
+	'''Take all data in the pipe and transfer to the communications queue.
+	The reason for this being in a separate thread is so that the load does not 
+	block the process and we can notify blocked receives.'''
+	
+	with open(self.make_address(os.getpid()), 'rb') as pipe_rd:
+		while True:
+			try:
+				message = pickel.load(pipe_rd)
+				with self.arrived_condition:
+					self.communication_queue.put(message)
+					self.arrived_condition.notify() #wake up anything waiting
+				except EOFError: #no writer open yet
+					time.sleep(0.01) # dont want to overload the cpu
+
+					
+with self.arrived_condition
+	self.arrived_condition.wait() # wait until new message

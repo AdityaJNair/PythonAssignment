@@ -1,35 +1,34 @@
 import os
 import sys
-import pickle
-import time
-import threading
-import atexit
-import re
-from queue import Queue
-import math
+from process_message_system import *
 
-#ANAI714
-#6393001
+class ServiceProvider(MessageProc):
+    service_dictionary = {}
 
-#GLOBAL ANY VAR
-ANY = 'any'
-class MessageProc:
+    #a user can register their information to the naming server by using their processid and their object type str(type(Object))
+    #process id is the id of the service
+    #object is the string name of that objecct
+    def register(self, processid, object):
+        self.service_dictionary.update({object, processid})
+        pipe_name = '/tmp/nameserver.fifo'
+        if (os.path.exists(pipe_name)):
+            with open(pipe_name, 'wb', buffering=0) as fifo:
+                pickle.dump([processid, object], fifo)
 
-    communication_queue = Queue()
-    arrived_condition = threading.Condition()
-    communication_list = []
-    timeout_start = False
-    timeout_data = None
-    timeout_action = lambda: None
-    timeout_reset_time = None
+    #A process will send its pid and the object that it is looking for
+    def grab_service(self, processid, object):
+        #check name server for the list of services we have
+        self.give(processid, object)
+
+    def startserver(self):
+        #initialise the server
+        #give its own named pipe that other processors will know as hardcoded
+        pipe_name = '/tmp/nameserver.fifo'
+        if not os.path.exists(pipe_name):
+            os.mkfifo(pipe_name)
 
     def give(self, pid, label, *values):
-        pipe_name = '/tmp/anai714%d.fifo' %(pid)
-        if(os.path.exists(pipe_name)):
-            with open(pipe_name, 'wb', buffering=0) as fifo:
-                pickle.dump([label, values], fifo )
-                #print('this is in get tmp')
-                #print(tmp_list)
+
 
     def receive(self, *messages):
         self.reset()
@@ -62,39 +61,13 @@ class MessageProc:
                     else:
                         self.arrived_condition.wait()
 
-    def reset(self):
-        self.timeout_start = False
-        self.timeout_data = self.timeout_reset_time
-        self.timeout_action = lambda: None
-
-    def start(self, *args):
-        pid = os.fork()
-        if(pid == 0):
-            self.main(*args)
-            sys.exit()
-        else:
-            time.sleep(0.1)
-        return pid
-
-    def main(self, *args):
-        #creates a pipe but if exists doesnt make another
-        #for parent and child at same time
-        #removes any previous pipes
-        pipe_name = '/tmp/anai714%d.fifo' %(os.getpid())
-        if not os.path.exists(pipe_name):
-            os.mkfifo(pipe_name)
-        #initialise any fields inside MessageProc
-        transfer_thread = threading.Thread(target=self.extract_from_pipe, daemon=True)
-        transfer_thread.start()
-        atexit.register(self.close)
-
     def extract_from_pipe(self):
         '''
         Take all data in the pipe and transfer to the communications queue.
         The reason for this being in a separate thread is so that the load does not
         block the process and we can notify blocked receives.
         '''
-        pipe_name = '/tmp/anai714%d.fifo' %(os.getpid())
+        pipe_name = '/tmp/nameserver.fifo'
         #print('{}  {} in extract'.format(os.getpid(), pipe_name))
         if(os.path.exists(pipe_name)):
             with open(pipe_name, 'rb', buffering=0) as pipe_rd:
@@ -104,31 +77,27 @@ class MessageProc:
                         with self.arrived_condition:
                             #self.communication_list.append(message)
                             self.communication_queue.put(message)
-                            #end time if a message comes in
-                            #need to create time here
-                            self.arrived_condition.notify() #wake up anything waiting
                     except EOFError: #no writer open yet
                             time.sleep(0.01) # dont want to overload the cpu
 
-    def close(self):
-        path = '/tmp/anai714%d.fifo' % (os.getpid())
-        if (os.path.exists(path)):
-            os.remove(path)
 
 
-'''
-    Message field class that stores the fields for the messages used in receive() and give()
-'''
-class Message:
+class A():
+    processid = os.getpid()
+    service_name = "A"
 
-    def __init__(self, data, action=lambda:None, guard=lambda:True):
-        self.data = data
-        self.action = action
-        self.guard = guard
+class B():
+    processid = os.getpid()
+    service_name = "B"
 
-class TimeOut:
+class C():
+    processid = os.getpid()
+    service_name = "C"
 
-    def __init__(self, data, action=lambda:None):
-        self.data = data
-        self.action = action
+class D():
+    processid = os.getpid()
+    service_name = "D"
+
+
+if __name__=='__main__':
 

@@ -1,0 +1,19 @@
+#Anai714
+#6393001
+
+Named pipes are useful as a means of communication between processes on the same machine however there can be a problem with messages from different senders getting interleaved.
+Explain under what circumstances you can be sure that such messages will NOT be interleaved.
+(2 marks)
+
+
+In the multiple consumer example the buffer space for the Buffer is a simple Python list which is not protected with a lock.
+Explain why it is safe for access to this space not to be controlled by a lock?
+(2 marks)
+
+
+Discuss the security issues involved in using the process id as the message passing identifier.
+(2 marks)
+
+
+(SE 370 students) Explain, giving an example, how your name server works.
+(2 marks)
