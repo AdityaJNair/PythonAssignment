@@ -6,6 +6,7 @@ import threading
 import atexit
 import re
 from queue import Queue
+import math
 
 #ANAI714
 #6393001
@@ -17,78 +18,64 @@ class MessageProc:
     communication_queue = Queue()
     arrived_condition = threading.Condition()
     communication_list = []
+    timeout_start = False
+    timeout_data = None
+    timeout_action = lambda: None
+    timeout_reset_time = None
 
-
-    '''
-        Sending a message
-        pid = process id
-        label = message name e.g. "data"
-        *values = any additional values
-        Gets the process id and the label which is the message and gives it
-        to the other processor through a pipe
-    '''
     def give(self, pid, label, *values):
         pipe_name = '/tmp/%d.fifo' %(pid)
         if(os.path.exists(pipe_name)):
-            with open(pipe_name, 'wb') as fifo:
-                tmp_list = []
-                tmp_list.append(label)
-                tmp_list.append(list(values))
-                pickle.dump(tmp_list, fifo )
+            with open(pipe_name, 'wb', buffering=0) as fifo:
+                pickle.dump([label, values], fifo )
                 #print('this is in get tmp')
                 #print(tmp_list)
-    '''
-        In receive method we iterate through the *messages parameter
-        and check the Message Objects made.
-        Check the list of messages to see if there is one that matches a condition
-        being waited for
-        if it finds a match it removes the message and carries out any actions associated with the message
-        Each receive only receives one message
-        Returns the lamda thing
-    '''
+
     def receive(self, *messages):
+        self.reset()
+        for message in messages:
+            if type(message) is TimeOut:
+                self.timeout_data = message.data
+                self.timeout_action = message.action
+                self.timeout_start = True
+                break
+        #print('end time ' + str(self.timeout_end_time) + ' start time ' + str(
+        #self.timeout_start_time) + ' end-start ' + str(self.timeout_end_time - self.timeout_start_time))
         while True:
-            if(self.communication_queue.qsize() != 0) or (len(self.communication_list) != 0):
-                if(self.communication_queue.qsize() != 0):
-                    item = self.communication_queue.get()
-                    self.communication_queue.task_done()
-                    self.communication_list.append(item)
-                for retreivedList in self.communication_list:
-                    for message in messages:
-                        if (message.guard()):
-                            if (message.data == retreivedList[0]) or (message.data == ANY):
-                                self.communication_list.remove(retreivedList)
-                                return message.action(*retreivedList[1])
-            else:
+            while(self.communication_queue.qsize() != 0):
+                self.communication_list.append(self.communication_queue.get())
+            for retreivedList in self.communication_list:
+                for message in messages:
+                #check if first field is data a digit. If not do messages
+                    if (type(message) is Message and (((message.data == retreivedList[0]) or (message.data == ANY)) and message.guard())):
+                        self.communication_list.remove(retreivedList)
+                        return message.action(*retreivedList[1])
+            if self.communication_queue.qsize()==0:
                 with self.arrived_condition:
-                    self.arrived_condition.wait()  # wait until new message
-            '''
-            if(len(self.communication_list) != 0):
-                for l in self.communication_list:
-                    retreivedList = l
-                    for message in messages:
-                        if(message.guard()):
-                            if(message.data == retreivedList[0]) or (message.data == ANY):
-                                self.communication_list.remove(l)
-                                return message.action(*retreivedList[1])
-            else:
-                with self.arrived_condition:
-                    self.arrived_condition.wait()
-            '''
-    '''
-        Starts the new process and returns the identifier
-    '''
+                    if self.timeout_start:
+                        start_time = time.time()
+                        check_if_notified = self.arrived_condition.wait(self.timeout_data)
+                        end_time = time.time()
+                        self.timeout_data = self.timeout_data - (end_time - start_time)
+                        if (not check_if_notified) or (self.timeout_data <= 0):
+                            return self.timeout_action()
+                    else:
+                        self.arrived_condition.wait()
+
+    def reset(self):
+        self.timeout_start = False
+        self.timeout_data = self.timeout_reset_time
+        self.timeout_action = lambda: None
+
     def start(self, *args):
         pid = os.fork()
         if(pid == 0):
             self.main(*args)
+            sys.exit()
         else:
             time.sleep(0.1)
         return pid
-    '''
-        Sets up the communication
-        setup method
-    '''
+
     def main(self, *args):
         #creates a pipe but if exists doesnt make another
         #for parent and child at same time
@@ -99,12 +86,8 @@ class MessageProc:
         #initialise any fields inside MessageProc
         transfer_thread = threading.Thread(target=self.extract_from_pipe, daemon=True)
         transfer_thread.start()
+        atexit.register(self.close)
 
-
-
-    '''
-    from roberts lec
-    '''
     def extract_from_pipe(self):
         '''
         Take all data in the pipe and transfer to the communications queue.
@@ -114,16 +97,24 @@ class MessageProc:
         pipe_name = '/tmp/%d.fifo' %(os.getpid())
         #print('{}  {} in extract'.format(os.getpid(), pipe_name))
         if(os.path.exists(pipe_name)):
-            with open(pipe_name, 'rb') as pipe_rd:
+            with open(pipe_name, 'rb', buffering=0) as pipe_rd:
                 while True:
                     try:
                         message = pickle.load(pipe_rd)
                         with self.arrived_condition:
                             #self.communication_list.append(message)
                             self.communication_queue.put(message)
+                            #end time if a message comes in
+                            #need to create time here
                             self.arrived_condition.notify() #wake up anything waiting
                     except EOFError: #no writer open yet
-                            time.sleep(0.1) # dont want to overload the cpu
+                            time.sleep(0.01) # dont want to overload the cpu
+
+    def close(self):
+        path = '/tmp/%d.fifo' % (os.getpid())
+        if (os.path.exists(path)):
+            os.remove(path)
+
 
 '''
     Message field class that stores the fields for the messages used in receive() and give()
@@ -137,12 +128,7 @@ class Message:
 
 class TimeOut:
 
-    def __init__(self, timeout, action=lambda:None):
-        self.timeout = timeout
+    def __init__(self, data, action=lambda:None):
+        self.data = data
         self.action = action
 
-@atexit.register
-def close():
-    path = '/tmp/%d.fifo' %(os.getpid())
-    if (os.path.exists(path)):
-            os.remove(path)
