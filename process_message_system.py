@@ -24,7 +24,7 @@ class MessageProc:
     timeout_reset_time = None
 
     def give(self, pid, label, *values):
-        pipe_name = '/tmp/%d.fifo' %(pid)
+        pipe_name = '/tmp/anai714%d.fifo' %(pid)
         if(os.path.exists(pipe_name)):
             with open(pipe_name, 'wb', buffering=0) as fifo:
                 pickle.dump([label, values], fifo )
@@ -80,7 +80,7 @@ class MessageProc:
         #creates a pipe but if exists doesnt make another
         #for parent and child at same time
         #removes any previous pipes
-        pipe_name = '/tmp/%d.fifo' %(os.getpid())
+        pipe_name = '/tmp/anai714%d.fifo' %(os.getpid())
         if not os.path.exists(pipe_name):
             os.mkfifo(pipe_name)
         #initialise any fields inside MessageProc
@@ -94,7 +94,7 @@ class MessageProc:
         The reason for this being in a separate thread is so that the load does not
         block the process and we can notify blocked receives.
         '''
-        pipe_name = '/tmp/%d.fifo' %(os.getpid())
+        pipe_name = '/tmp/anai714%d.fifo' %(os.getpid())
         #print('{}  {} in extract'.format(os.getpid(), pipe_name))
         if(os.path.exists(pipe_name)):
             with open(pipe_name, 'rb', buffering=0) as pipe_rd:
@@ -111,7 +111,7 @@ class MessageProc:
                             time.sleep(0.01) # dont want to overload the cpu
 
     def close(self):
-        path = '/tmp/%d.fifo' % (os.getpid())
+        path = '/tmp/anai714%d.fifo' % (os.getpid())
         if (os.path.exists(path)):
             os.remove(path)
 
