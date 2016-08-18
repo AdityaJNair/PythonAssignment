@@ -1,0 +1,53 @@
+#Anai714
+#6393001
+
+Named pipes are useful as a means of communication between processes on the same machine however there can be a problem with messages from different senders getting interleaved.
+Explain under what circumstances you can be sure that such messages will NOT be interleaved.
+(2 marks)
+
+
+In the multiple consumer example the buffer space for the Buffer is a simple Python list which is not protected with a lock.
+Explain why it is safe for access to this space not to be controlled by a lock?
+(2 marks)
+
+
+Discuss the security issues involved in using the process id as the message passing identifier.
+(2 marks)
+
+
+(SE 370 students) Explain, giving an example, how your name server works.
+(2 marks)
+
+Files for name server
+name_server.py = name server
+ConsumerA, ConsumerB, .py = Clients
+ServiceA, ServiceB, .py = Services
+
+To use all of the files, open 5 terminals to run each process.
+Run the name_server.py first and it will wait for messages with a timeout of 10seconds if nothing is received
+You can run any file now, but for a basic run:
+
+1) on another terminal run ServiceA.py
+   What this will do is talk to the ServiceProvider (Name_server) and give its Object(ServiceA) and its pipe(address) to the name server
+   and it will be stored in the name server for its lifespam.
+   Once it sends it to the name_server the server will show a message in the terminal that it has received the ServiceA address and gives
+   a message to ServiceA.
+   ServiceA will run forever theoretically but for this assignment it will timeout in 10 seconds if nothing is received. This is to remove
+   the pipes in the /tmp
+2) on another terminal run ConsumerA.py
+   The ConsumerA will ask for a ServiceA address and it gives its own address.
+   The name_server will check its dictionary if the address exists (if it does returns the address, if not return none)
+   The ConsumerA will receive a message back from the name_server with the address of ServiceA pipe and then close since it is assumed
+   the consumer is querying the name_server
+
+ You can repeat the 2 steps with the other consumer and services (Consumer A only takes Service A) -- B -> B
+ The name_server, ServiceA, ServiceB will timeout after 10 seconds, this is to remove those files from the tmp folder.
+ Realistically the name_server sould run forever, but for this instance it will timeout in 10 seconds if nothing is received.
+
+ The query message protocols are
+    grab - if a client and want to get a service address
+    register - if a service and want to register with the name server
+
+ Services accept any message since its a basic implementation only.
+
+ For more understanding look at the comments in the code
