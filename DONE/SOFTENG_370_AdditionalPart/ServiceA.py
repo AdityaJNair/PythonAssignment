@@ -29,7 +29,7 @@ class ServiceA():
     GIVES a message to the 'nameserver' that runs a REGISTER with itself as the Object and its pipe address
     '''
     def start_service(self):
-        self.service_name = '/tmp/'+str(type(self).__name__)+'.fifo'
+        self.service_name = '/tmp/'+str(str(type(self).__name__)+str(os.getpid()))+'.fifo'
         if not os.path.exists(self.service_name):
             os.mkfifo(self.service_name)
         transfer_thread = threading.Thread(target=self.extract_from_pipe, daemon=True)
@@ -138,7 +138,7 @@ class ServiceA():
 
     # At close remove the process pipes
     def close(self):
-        path = '/tmp/'+str(type(self).__name__)+'.fifo'
+        path = '/tmp/'+str(str(type(self).__name__)+str(os.getpid()))+'.fifo'
         if (os.path.exists(path)):
             os.remove(path)
 
