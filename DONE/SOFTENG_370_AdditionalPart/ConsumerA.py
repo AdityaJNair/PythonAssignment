@@ -28,7 +28,7 @@ class ConsumerA():
     GIVES a message to the 'nameserver' that runs a GRAB with the object it is looking for as the Object and consumer Name which will be used to open its pipe
     '''
     def start_consumer(self):
-        self.consumer_name = '/tmp/'+str(type(self).__name__)+'.fifo'
+        self.consumer_name = '/tmp/'+str(str(type(self).__name__)+str(os.getpid()))+'.fifo'
         if not os.path.exists(self.consumer_name):
             os.mkfifo(self.consumer_name)
         #Start threading into the extract from pipe method
@@ -37,7 +37,7 @@ class ConsumerA():
         time.sleep(1)
         #the protocol to send to the nameserver
         #(NAMESERVER, GRAB TO GET SERVICE ADDRESS, MY CONSUMER CLASS NAME, SERVICE I WANT TO GET THE ADDRESS OF)
-        self.give('nameserver', 'grab', str(type(self).__name__), 'ServiceA')
+        self.give('nameserver', 'grab', str(str(type(self).__name__)+str(os.getpid())), 'ServiceA')
         self.receive(
             Message(
                 ANY,
@@ -90,7 +90,7 @@ class ConsumerA():
 
     # At close remove the process pipes
     def close(self):
-        path = '/tmp/'+str(type(self).__name__)+'.fifo'
+        path = '/tmp/'+str(str(type(self).__name__)+str(os.getpid()))+'.fifo'
         if (os.path.exists(path)):
             os.remove(path)
 
