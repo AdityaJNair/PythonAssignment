@@ -28,7 +28,7 @@ ServiceA, ServiceB, .py = Services
 Run the name_server first
 To use all of the files, open 5 terminals to run each process.
 Run the name_server.py first and it will wait for messages with a timeout of 10seconds if nothing is received
-Clients will not store their information as they are not a server
+Clients will not store their information as they are not a serverS
 You can run any file now, but for a basic run:
 
 1) on another terminal run ServiceA.py
