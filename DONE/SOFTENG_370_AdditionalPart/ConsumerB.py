@@ -34,7 +34,8 @@ class ConsumerB():
         transfer_thread = threading.Thread(target=self.extract_from_pipe, daemon=True)
         transfer_thread.start()
         time.sleep(1)
-
+		#the protocol to send to the nameserver
+        #(NAMESERVER, GRAB TO GET SERVICE ADDRESS, MY CONSUMER CLASS NAME, SERVICE I WANT TO GET THE ADDRESS OF)
         self.give('nameserver', 'grab', str(type(self).__name__), 'ServiceB')
         self.receive(
             Message(
