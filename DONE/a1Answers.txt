@@ -11,8 +11,10 @@ Explain why it is safe for access to this space not to be controlled by a lock?
 (2 marks)
 
 
+
 Discuss the security issues involved in using the process id as the message passing identifier.
 (2 marks)
+
 
 
 (SE 370 students) Explain, giving an example, how your name server works.
@@ -23,8 +25,10 @@ name_server.py = name server
 ConsumerA, ConsumerB, .py = Clients
 ServiceA, ServiceB, .py = Services
 
+Run the name_server first
 To use all of the files, open 5 terminals to run each process.
 Run the name_server.py first and it will wait for messages with a timeout of 10seconds if nothing is received
+Clients will not store their information as they are not a server
 You can run any file now, but for a basic run:
 
 1) on another terminal run ServiceA.py
@@ -34,20 +38,27 @@ You can run any file now, but for a basic run:
    a message to ServiceA.
    ServiceA will run forever theoretically but for this assignment it will timeout in 10 seconds if nothing is received. This is to remove
    the pipes in the /tmp
+   
 2) on another terminal run ConsumerA.py
-   The ConsumerA will ask for a ServiceA address and it gives its own address.
-   The name_server will check its dictionary if the address exists (if it does returns the address, if not return none)
+   The ConsumerA will ask for a ServiceA Service address and it gives its own address so the name_server knows who to send back the information to
+   The name_server will check its dictionary if the address exists (if it does returns the address, if not return None)
    The ConsumerA will receive a message back from the name_server with the address of ServiceA pipe and then close since it is assumed
-   the consumer is querying the name_server
+   the consumer is querying the name_server only once.
 
  You can repeat the 2 steps with the other consumer and services (Consumer A only takes Service A) -- B -> B
  The name_server, ServiceA, ServiceB will timeout after 10 seconds, this is to remove those files from the tmp folder.
  Realistically the name_server sould run forever, but for this instance it will timeout in 10 seconds if nothing is received.
 
  The query message protocols are
-    grab - if a client and want to get a service address
-    register - if a service and want to register with the name server
+    grab - if a client and want to get a service address. 
+	#the protocol to send to the nameserver
+    #(NAMESERVER NAME, GRAB TO GET SERVICE ADDRESS, MY CONSUMER CLASS NAME, SERVICE I WANT TO GET THE ADDRESS OF)
+    self.give('nameserver', 'grab', str(type(self).__name__), 'ServiceB')
+    
+	register - if a service and want to register with the name server
+	#(NAMESRVER NAME, REGISTER TO STORE ADDRESS, NAME OF SERVICE CLASS, PATH OF PIPE FOR SERVICE)
+    self.give('nameserver', 'register', str(type(self).__name__), self.service_name)
 
- Services accept any message since its a basic implementation only.
-
+ Services accept any message since its a basic implementation only. In reality it will take in messages that work with the client side to access its methods 
+ (when the service implements them)
  For more understanding look at the comments in the code
